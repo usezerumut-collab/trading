@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
+from supabase import create_client, Client
 import pandas as pd
 from datetime import datetime
 
@@ -22,15 +23,25 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. MESAJ SİSTEMİ (BASİT VERİTABANI) ---
-# Not: Streamlit Community Cloud üzerinde geçici mesajlaşma sağlar.
-if 'messages' not in st.session_state:
-    st.session_state.messages = []
+# --- 2. SUPABASE BAĞLANTISI ---
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(url, key)
+
+def get_data():
+    try:
+        response = supabase.table("messages").select("*").order("id", desc=True).limit(20).execute()
+        return pd.DataFrame(response.data)
+    except:
+        return pd.DataFrame(columns=["user", "message", "timestamp"])
 
 def send_data(u, m):
-    new_msg = {"user": u, "message": m, "timestamp": datetime.now().strftime("%H:%M")}
-    st.session_state.messages.append(new_msg)
-    return True
+    try:
+        data = {"user": u, "message": m, "timestamp": datetime.now().strftime("%H:%M")}
+        supabase.table("messages").insert(data).execute()
+        return True
+    except:
+        return False
 
 # Session States
 if 'auth' not in st.session_state: st.session_state.auth = False
@@ -76,9 +87,12 @@ else:
             msg = st.text_area("Mesajını buraya bırak...")
             if st.button("SİSTEME GÖNDER"):
                 if msg:
-                    send_data(st.session_state.user, msg)
-                    st.success("İletildi!")
+                    if send_data(st.session_state.user, msg):
+                        st.success("İletildi!"); st.rerun()
+                    else: st.error("Bağlantı hatası!")
         with r:
             st.write("### SQUAD MESSAGES")
-            for m in reversed(st.session_state.messages):
-                st.markdown(f'<div class="chat-card"><b style="color:#00ff00;">@{m["user"]}</b><br>{m["message"]} <br><small style="color:#666;">{m["timestamp"]}</small></div>', unsafe_allow_html=True)
+            df = get_data()
+            if not df.empty:
+                for i, row in df.iterrows():
+                    st.markdown(f'<div class="chat-card"><b style="color:#00ff00;">@{row["user"]}</b><br>{row["message"]} <br><small style="color:#666;">{row["timestamp"]}</small></div>', unsafe_allow_html=True)
