@@ -4,22 +4,46 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-# --- 1. AYARLAR ---
-st.set_page_config(page_title="GALAXY HQ | PRO", layout="wide", initial_sidebar_state="collapsed")
+# --- 1. CONFIG & DARK THEME ---
+st.set_page_config(page_title="GALAXY HQ | DARK", layout="wide", initial_sidebar_state="collapsed")
 
-# Bağlantıyı her seferinde temizle (Beyaz ekran ve bağlantı hatasını önlemek için)
-st.cache_data.clear()
+# Arka planı simsiyah, yazıları bembeyaz yapan CSS
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap');
+    
+    .stApp { background-color: #000000 !important; color: #ffffff !important; }
+    header, footer { visibility: hidden !important; }
+    
+    /* Sekme ve Buton Tasarımları */
+    .stTabs [data-baseweb="tab-list"] button { color: #ffffff !important; font-family: 'Space Grotesk'; }
+    .stButton > button { 
+        background: #1e1e1e !important; color: #00ff00 !important; 
+        border: 1px solid #00ff00 !important; border-radius: 5px;
+        font-weight: bold; width: 100%;
+    }
+    .stButton > button:hover { background: #00ff00 !important; color: #000 !important; }
+    
+    /* Mesaj Kartları */
+    .chat-card { 
+        background: #111111; padding: 15px; border-radius: 10px; 
+        border: 1px solid #333; margin-bottom: 10px; color: #eee;
+    }
+    
+    /* Input Alanları */
+    input, textarea { background-color: #111 !important; color: white !important; border: 1px solid #444 !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# SENİN LINKIN
+# --- 2. BAĞLANTI AYARLARI ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1HbSdgHwC-56zUtsLku8Vq4eQbGg3qrH1dUdjB8-nBzg/edit?usp=sharing"
 
 def get_data():
     try:
-        # ttl=0 bağlantının bayatlamasını engeller
         conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read(spreadsheet=SHEET_URL, worksheet="Sheet1", ttl=0)
-        return df
-    except:
+        # ttl=0 yaparak her seferinde taze veri çekiyoruz
+        return conn.read(spreadsheet=SHEET_URL, worksheet="Sheet1", ttl=0)
+    except Exception as e:
         return pd.DataFrame(columns=["user", "message", "timestamp"])
 
 def send_data(u, m):
@@ -30,73 +54,60 @@ def send_data(u, m):
         conn = st.connection("gsheets", type=GSheetsConnection)
         conn.update(spreadsheet=SHEET_URL, data=updated_df)
         return True
-    except:
+    except Exception as e:
+        st.error(f"Detaylı Hata: {e}") # Hatayı buraya yazdırıyoruz ki anlayalım
         return False
 
-# Session State
+# Session States
 if 'auth' not in st.session_state: st.session_state.auth = False
 if 'user' not in st.session_state: st.session_state.user = ""
 if 'page' not in st.session_state: st.session_state.page = "📈 TERMINAL"
-
-# --- 2. TASARIM ---
-st.markdown("""
-    <style>
-    .stApp { background: #f8f9fa !important; color: #000; }
-    .stButton > button { background: #000 !important; color: #fff !important; border-radius: 10px; }
-    .chat-card { background: white; padding: 15px; border-radius: 12px; border: 1px solid #ddd; margin-bottom: 10px; color: #000; }
-    </style>
-    """, unsafe_allow_html=True)
 
 # --- 3. AKIŞ ---
 if not st.session_state.auth:
     _, cent, _ = st.columns([1, 1, 1])
     with cent:
-        st.title("GALAXY HQ")
-        u_id = st.text_input("Commander ID", key="login_box")
-        if st.button("AUTHENTICATE"):
+        st.markdown("<h1 style='text-align:center; color:#00ff00;'>GALAXY HQ</h1>", unsafe_allow_html=True)
+        u_id = st.text_input("COMMANDER ID")
+        if st.button("LOGIN"):
             if u_id:
-                st.session_state.user = u_id
-                st.session_state.auth = True
-                st.rerun()
+                st.session_state.user = u_id; st.session_state.auth = True; st.rerun()
 else:
     # MENÜ
-    c1, c2, c3, c4 = st.columns(4)
-    if c1.button("📈 TERMINAL"): st.session_state.page = "📈 TERMINAL"; st.rerun()
-    if c2.button("🔥 NEWS"): st.session_state.page = "🔥 NEWS"; st.rerun()
-    if c3.button("💬 SQUAD HUB"): st.session_state.page = "💬 SQUAD HUB"; st.rerun()
-    if c4.button("🔴 EXIT"): st.session_state.auth = False; st.rerun()
+    m1, m2, m3, m4 = st.columns(4)
+    if m1.button("📈 CHART"): st.session_state.page = "📈 TERMINAL"; st.rerun()
+    if m2.button("🔥 NEWS"): st.session_state.page = "🔥 NEWS"; st.rerun()
+    if m3.button("💬 SQUAD"): st.session_state.page = "💬 SQUAD"; st.rerun()
+    if m4.button("🔴 EXIT"): st.session_state.auth = False; st.rerun()
 
-    st.divider()
+    st.markdown("<hr style='border: 1px solid #333'>", unsafe_allow_html=True)
 
     if st.session_state.page == "📈 TERMINAL":
-        main, side = st.columns([3, 1])
-        with main:
-            t1, t2, t3 = st.tabs(["EUR/USD", "GOLD", "SILVER"])
-            with t1: components.html('<iframe src="https://s.tradingview.com/widgetembed/?symbol=FX:EURUSD&interval=15&theme=light" width="100%" height="500"></iframe>', height=510)
-            with t2: components.html('<iframe src="https://s.tradingview.com/widgetembed/?symbol=OANDA:XAUUSD&interval=15&theme=light" width="100%" height="500"></iframe>', height=510)
-            with t3: components.html('<iframe src="https://s.tradingview.com/widgetembed/?symbol=OANDA:XAGUSD&interval=15&theme=light" width="100%" height="500"></iframe>', height=510)
-        with side:
-            st.write("### MARKET")
-            components.html('<iframe src="https://s.tradingview.com/widgetembed/?symbol=OANDA:XAUUSD&interval=D&theme=light" width="100%" height="200"></iframe>', height=210)
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            t1, t2 = st.tabs(["GOLD (XAUUSD)", "EURUSD"])
+            with t1: components.html('<iframe src="https://s.tradingview.com/widgetembed/?symbol=OANDA:XAUUSD&interval=15&theme=dark" width="100%" height="600"></iframe>', height=610)
+            with t2: components.html('<iframe src="https://s.tradingview.com/widgetembed/?symbol=FX:EURUSD&interval=15&theme=dark" width="100%" height="600"></iframe>', height=610)
+        with c2:
+            st.markdown("### DATA FEED")
+            components.html('<iframe src="https://s.tradingview.com/widgetembed/?symbol=OANDA:XAUUSD&interval=D&theme=dark" width="100%" height="300"></iframe>', height=310)
 
-    elif st.session_state.page == "💬 SQUAD HUB":
+    elif st.session_state.page == "🔥 NEWS":
+        st.markdown("### EKONOMİK TAKVİM")
+        # Haberler kısmını düzelten güncel widget
+        components.html('<div style="height:800px;"><script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>{"colorTheme":"dark","isTransparent":false,"width":"100%","height":"100%","locale":"tr","importanceFilter":"-1,0,1"}</script></div>', height=800)
+
+    elif st.session_state.page == "💬 SQUAD":
         l, r = st.columns([1, 2])
         with l:
-            st.write("### MESAJ GÖNDER")
-            msg = st.text_area("Notun...", key="msg_area")
-            if st.button("SİSTEME YÜKLE"):
+            msg = st.text_area("Mesajını buraya bırak...")
+            if st.button("SİSTEME GÖNDER"):
                 if msg:
                     if send_data(st.session_state.user, msg):
-                        st.success("Mesaj Tabloya Çakıldı!")
-                        st.rerun()
-                    else:
-                        st.error("Bağlantı Hatası! Lütfen Google Sheet 'Düzenleyici' iznini kontrol et.")
+                        st.success("İletildi!"); st.rerun()
         with r:
-            st.write("### SQUAD FEED")
+            st.write("### SQUAD MESSAGES")
             data = get_data()
             if not data.empty:
-                # Sadece son 20 mesajı göster ki sayfa kasmasın
-                for i, row in data.iloc[::-1].head(20).iterrows():
-                    st.markdown(f'<div class="chat-card"><b>@{row["user"]}</b>: {row["message"]} <br><small style="color:gray;">{row["timestamp"]}</small></div>', unsafe_allow_html=True)
-            else:
-                st.info("Henüz mesaj yok veya bağlantı kuruluyor...")
+                for i, row in data.iloc[::-1].head(15).iterrows():
+                    st.markdown(f'<div class="chat-card"><b style="color:#00ff00;">@{row["user"]}</b><br>{row["message"]} <br><small style="color:#666;">{row["timestamp"]}</small></div>', unsafe_allow_html=True)
