@@ -1,62 +1,36 @@
 import streamlit as st
 import streamlit.components.v1 as components
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
 # --- 1. CONFIG & DARK THEME ---
 st.set_page_config(page_title="GALAXY HQ | DARK", layout="wide", initial_sidebar_state="collapsed")
 
-# Arka planı simsiyah, yazıları bembeyaz yapan CSS
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap');
-    
     .stApp { background-color: #000000 !important; color: #ffffff !important; }
     header, footer { visibility: hidden !important; }
-    
-    /* Sekme ve Buton Tasarımları */
-    .stTabs [data-baseweb="tab-list"] button { color: #ffffff !important; font-family: 'Space Grotesk'; }
     .stButton > button { 
         background: #1e1e1e !important; color: #00ff00 !important; 
-        border: 1px solid #00ff00 !important; border-radius: 5px;
-        font-weight: bold; width: 100%;
+        border: 1px solid #00ff00 !important; border-radius: 5px; width: 100%;
     }
-    .stButton > button:hover { background: #00ff00 !important; color: #000 !important; }
-    
-    /* Mesaj Kartları */
     .chat-card { 
         background: #111111; padding: 15px; border-radius: 10px; 
         border: 1px solid #333; margin-bottom: 10px; color: #eee;
     }
-    
-    /* Input Alanları */
     input, textarea { background-color: #111 !important; color: white !important; border: 1px solid #444 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. BAĞLANTI AYARLARI ---
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1HbSdgHwC-56zUtsLku8Vq4eQbGg3qrH1dUdjB8-nBzg/edit?usp=sharing"
-
-def get_data():
-    try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        # ttl=0 yaparak her seferinde taze veri çekiyoruz
-        return conn.read(spreadsheet=SHEET_URL, worksheet="Sheet1", ttl=0)
-    except Exception as e:
-        return pd.DataFrame(columns=["user", "message", "timestamp"])
+# --- 2. MESAJ SİSTEMİ (BASİT VERİTABANI) ---
+# Not: Streamlit Community Cloud üzerinde geçici mesajlaşma sağlar.
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
 
 def send_data(u, m):
-    try:
-        df = get_data()
-        new_row = pd.DataFrame([{"user": u, "message": m, "timestamp": datetime.now().strftime("%H:%M")}])
-        updated_df = pd.concat([df, new_row], ignore_index=True)
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        conn.update(spreadsheet=SHEET_URL, data=updated_df)
-        return True
-    except Exception as e:
-        st.error(f"Detaylı Hata: {e}") # Hatayı buraya yazdırıyoruz ki anlayalım
-        return False
+    new_msg = {"user": u, "message": m, "timestamp": datetime.now().strftime("%H:%M")}
+    st.session_state.messages.append(new_msg)
+    return True
 
 # Session States
 if 'auth' not in st.session_state: st.session_state.auth = False
@@ -94,7 +68,6 @@ else:
 
     elif st.session_state.page == "🔥 NEWS":
         st.markdown("### EKONOMİK TAKVİM")
-        # Haberler kısmını düzelten güncel widget
         components.html('<div style="height:800px;"><script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>{"colorTheme":"dark","isTransparent":false,"width":"100%","height":"100%","locale":"tr","importanceFilter":"-1,0,1"}</script></div>', height=800)
 
     elif st.session_state.page == "💬 SQUAD":
@@ -103,11 +76,9 @@ else:
             msg = st.text_area("Mesajını buraya bırak...")
             if st.button("SİSTEME GÖNDER"):
                 if msg:
-                    if send_data(st.session_state.user, msg):
-                        st.success("İletildi!"); st.rerun()
+                    send_data(st.session_state.user, msg)
+                    st.success("İletildi!")
         with r:
             st.write("### SQUAD MESSAGES")
-            data = get_data()
-            if not data.empty:
-                for i, row in data.iloc[::-1].head(15).iterrows():
-                    st.markdown(f'<div class="chat-card"><b style="color:#00ff00;">@{row["user"]}</b><br>{row["message"]} <br><small style="color:#666;">{row["timestamp"]}</small></div>', unsafe_allow_html=True)
+            for m in reversed(st.session_state.messages):
+                st.markdown(f'<div class="chat-card"><b style="color:#00ff00;">@{m["user"]}</b><br>{m["message"]} <br><small style="color:#666;">{m["timestamp"]}</small></div>', unsafe_allow_html=True)
