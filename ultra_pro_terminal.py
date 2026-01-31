@@ -24,23 +24,32 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. SUPABASE BAĞLANTISI ---
-url = st.secrets["SUPABASE_URL"]
-key = st.secrets["SUPABASE_KEY"]
+url = st.secrets.get("SUPABASE_URL")
+key = st.secrets.get("SUPABASE_KEY")
+
+if not url or not key:
+    st.error("Secrets (Anahtarlar) bulunamadı! Lütfen Streamlit Settings > Secrets kısmını kontrol et.")
+    st.stop()
+
+# Bağlantıyı kur
 supabase: Client = create_client(url, key)
 
 def get_data():
     try:
+        # Mesajları Supabase'den çek
         response = supabase.table("messages").select("*").order("id", desc=True).limit(20).execute()
         return pd.DataFrame(response.data)
-    except:
+    except Exception as e:
         return pd.DataFrame(columns=["user", "message", "timestamp"])
 
 def send_data(u, m):
     try:
+        # Mesajı Supabase'e gönder
         data = {"user": u, "message": m, "timestamp": datetime.now().strftime("%H:%M")}
         supabase.table("messages").insert(data).execute()
         return True
-    except:
+    except Exception as e:
+        st.error(f"Hata detayı: {e}")
         return False
 
 # Session States
@@ -89,10 +98,11 @@ else:
                 if msg:
                     if send_data(st.session_state.user, msg):
                         st.success("İletildi!"); st.rerun()
-                    else: st.error("Bağlantı hatası!")
         with r:
             st.write("### SQUAD MESSAGES")
             df = get_data()
             if not df.empty:
                 for i, row in df.iterrows():
                     st.markdown(f'<div class="chat-card"><b style="color:#00ff00;">@{row["user"]}</b><br>{row["message"]} <br><small style="color:#666;">{row["timestamp"]}</small></div>', unsafe_allow_html=True)
+            else:
+                st.info("Mesaj bulunamadı veya tablo boş.")
